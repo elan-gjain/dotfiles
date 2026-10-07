@@ -92,3 +92,103 @@ function Kill-All {
     }
 }
 
+function Get-PyPiExpiry {
+    <#
+    .SYNOPSIS
+        Extracts and displays the expiration date from the ELANPYPI_URL environment variable.
+    .DESCRIPTION
+        Parses the VssSessionToken timestamp inside $env:ELANPYPI_URL, converts it to a 
+        readable date, and calculates the remaining validity time.
+    #>
+    [CmdletBinding()]
+    param()
+
+    process {
+        # 1. Check if the environment variable exists
+        if (-not $env:ELANPYPI_URL) {
+            Write-Error "Environment variable $env:ELANPYPI_URL is not set."
+            return
+        }
+
+        # 2. Use RegEx to isolate the timestamp matching YYYY-MM-DD followed by the time
+        if ($env:ELANPYPI_URL -match 'VssSessionToken_(?<Date>\d{4}-\d{2}-\d{2})T(?<Time>\d{4})') {
+            $DateStr = $Matches['Date']
+            $TimeStr = $Matches['Time']
+
+            # Reformat to a standard string that PowerShell can parse (e.g., "2026-10-01 13:07")
+            $FormattedTimestamp = "{0} {1}:{2}" -f $DateStr, $TimeStr.Substring(0,2), $TimeStr.Substring(2,2)
+            
+            # Convert to a real DateTime object
+            $ExpiryDate = [DateTime]::ParseExact($FormattedTimestamp, "yyyy-MM-dd HH:mm", $null)
+            $TimeRemaining = $ExpiryDate - (Get-Date)
+
+            # 3. Output a clean summary
+            Write-Host "--- PyPi Token Status ---" -ForegroundColor Cyan
+            Write-Host "Expiry Date: " -NoNewline
+            Write-Host $ExpiryDate.ToString("F") -ForegroundColor Yellow
+            
+            if ($TimeRemaining.Ticks -lt 0) {
+                Write-Host "Status:      EXPIRED" -ForegroundColor Red
+            } else {
+                Write-Host "Time Left:   " -NoNewline
+                Write-Host ("{0} days, {1} hours, {2} minutes" -f $TimeRemaining.Days, $TimeRemaining.Hours, $TimeRemaining.Minutes) -ForegroundColor Green
+            }
+        } else {
+            Write-Error "Could not find a valid 'VssSessionToken_YYYY-MM-DDTHHmm' timestamp inside the URL."
+        }
+    }
+}
+
+
+function Install-FirewallCertificates {
+    <#
+    .SYNOPSIS
+        Runs the elanpy script to install firewall certificates.
+    #>
+    [CmdletBinding()]
+    param()
+
+    process {
+        Write-Host "Installing firewall certificates..." -ForegroundColor Cyan
+        python -c "from elanpy.misc.install_firewall_certificates import install_firewall_certificates; install_firewall_certificates()"
+    }
+}
+
+function Update-Requirements {
+    <#
+    .SYNOPSIS
+        Refreshes the environment variables and installs pip requirements using the secure PyPi URL.
+    #>
+    [CmdletBinding()]
+    param()
+
+    process {
+        # 1. Run the environment update function
+        Update-Environment
+
+        # 2. Verify the PyPi URL variable is present before installing
+        if (-not $env:ELANPYPI_URL) {
+            Write-Error "Cannot install requirements: $env:ELANPYPI_URL is not set."
+            return
+        }
+
+        # 3. Check for the requirements file in the current directory
+        if (-not (Test-Path "requirements.txt")) {
+            Write-Error "requirements.txt not found in the current directory: $(Get-Location)"
+            return
+        }
+
+        Write-Host "Installing Python packages from requirements.txt..." -ForegroundColor Cyan
+        pip install -r requirements.txt --extra-index-url $env:ELANPYPI_URL
+    }
+}
+
+function Find-File {
+    param(
+        [Parameter(Mandatory=$true, Position=0)]
+        [string]$SearchTerm
+    )
+    rg --files | rg -i $SearchTerm
+}
+Set-Alias ff Find-File
+
