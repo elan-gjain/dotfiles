@@ -86,11 +86,11 @@ function pwd {
 }
 
 function Edit-Aliases {
-    code "C:\Users\gjain\Documents\PowerShell\aliases.ps1"
+    code "C:\Users\gjain\Documents\GitHub\dotfiles\Powershell\aliases.ps1"
 }
 
 function Edit-Functions {
-    code "C:\Users\gjain\Documents\PowerShell\functions.ps1"
+    code "C:\Users\gjain\Documents\GitHub\dotfiles\Powershell\functions.ps1"
 }
 
 Set-Alias python39 "C:\Users\gjain\AppData\Roaming\uv\python\cpython-3.9-windows-x86_64-none\python.exe"

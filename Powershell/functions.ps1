@@ -192,3 +192,25 @@ function Find-File {
 }
 Set-Alias ff Find-File
 
+function touch {
+    param(
+        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        [string[]]$Paths
+    )
+
+    process {
+        foreach ($Path in $Paths) {
+            # Resolve the path to handle relative paths accurately
+            $ResolvedPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+            
+            if (Test-Path -LiteralPath $ResolvedPath) {
+                # File exists: update both Last Write and Last Access timestamps to right now
+                (Get-Item -LiteralPath $ResolvedPath).LastWriteTime = [DateTime]::Now
+                (Get-Item -LiteralPath $ResolvedPath).LastAccessTime = [DateTime]::Now
+            } else {
+                # File does not exist: create a new empty file
+                New-Item -ItemType File -Path $ResolvedPath -Force | Out-Null
+            }
+        }
+    }
+}
