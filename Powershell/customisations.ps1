@@ -20,6 +20,6 @@ if (Get-Module -ListAvailable PSReadLine) {
 $env:ARTIFACTS_CREDENTIALPROVIDER_FEED_PROVIDER_CHOICE = "AzCli"
 
 # Custom Profile Path Mappings
-$env:PROFILE_CUSTOMISATIONS = "$HOME\Documents\GitHub\dotfiles\customisations.ps1"
-$env:PROFILE_FUNCTIONS      = "$HOME\Documents\GitHub\dotfiles\functions.ps1"
-$env:PROFILE_ALIASES        = "$HOME\Documents\GitHub\dotfiles\aliases.ps1"
+$env:PROFILE_CUSTOMISATIONS = "$HOME\Documents\GitHub\dotfiles\PowerShell\customisations.ps1"
+$env:PROFILE_FUNCTIONS      = "$HOME\Documents\GitHub\dotfiles\PowerShell\functions.ps1"
+$env:PROFILE_ALIASES        = "$HOME\Documents\GitHub\dotfiles\PowerShell\aliases.ps1"

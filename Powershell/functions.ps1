@@ -214,3 +214,46 @@ function touch {
         }
     }
 }
+
+
+# bs -> Interactive Local Branch Switcher
+function Invoke-GitBranchSwitchLocal {
+    # Get clean list of local branches and pipe to fzf
+    $branch = git branch --format="%(refname:short)" | fzf --header="Switch Local Branch"
+    
+    if ($branch) {
+        git switch $branch.Trim()
+    }
+}
+New-Alias bs Invoke-GitBranchSwitchLocal -Force
+
+# bso -> Interactive Local + Remote Branch Switcher (with separator)
+function Invoke-GitBranchSwitchAll {
+    # 1. Fetch clean local branches
+    $localBranches = git branch --format="%(refname:short)"
+    
+    # 2. Fetch remote branches, removing the 'origin/' prefix to make switching clean
+    $remoteBranches = git branch -r --format="%(refname:short)" | Where-Object { $_ -notmatch '->' }
+    
+    # 3. Combine them using fzf's header lines or build an inline header separator
+    # We pipe local branches first, a custom visual separator line, then remote branches
+    $selection = @(
+        $localBranches
+        "--- REMOTE BRANCHES ---"
+        $remoteBranches
+    ) | fzf --header="Switch Branch (Local or Remote)" --preview-window=hidden
+    
+    # 4. Process selection (ignore if they click the separator label)
+    if ($selection -and $selection -ne "--- REMOTE BRANCHES ---") {
+        $cleanBranch = $selection.Trim()
+        
+        # If it's a remote branch (starts with origin/), strip it so git switch tracks it locally
+        if ($cleanBranch -like "origin/*") {
+            $cleanBranch = $cleanBranch -replace "^origin/", ""
+        }
+        
+        git switch $cleanBranch
+    }
+}
+New-Alias bso Invoke-GitBranchSwitchAll -Force
+
