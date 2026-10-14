@@ -99,3 +99,5 @@ Set-Alias python312 "C:\python\python3.12.9\python.exe"
 
 function Invoke-Exit { exit }
 Set-Alias -Name exti -Value Invoke-Exit
+
+function b { git branch $args }

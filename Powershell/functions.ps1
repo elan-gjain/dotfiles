@@ -279,7 +279,7 @@ function Invoke-GitBranchDelete {
     Write-Host ""
     Write-Host "WARNING: You are about to delete local branch: " -NoNewline -ForegroundColor Yellow
     Write-Host $branch -ForegroundColor Cyan
-    $confirmation = Read-Host "Do you really want to delete this branch? (y/N)"
+    $confirmation = Read-Host "Do you really want to delete this branch? (y/n)"
 
     # 4. Process deletion if explicitly confirmed
     if ($confirmation -match "^[yY](es)?$") {
