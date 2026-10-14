@@ -307,15 +307,23 @@ function gor {
         return
     }
 
+    # Get the current branch name
+    $branch = git branch --show-current 2>$null
+
     # Clean up SSH or HTTPS URL formatting into a browser-ready link
-    # Handles: git@github.com:user/repo.git or https://github.com
     $webUrl = $remoteUrl -replace '^git@', 'https://' `
                          -replace '(?<=https://[^/]+):', '/' `
-                         -replace '\.git\$', ''
+                         -replace '\.git$', ''
+
+    # Append branch path unless on main or master
+    if ($branch -and $branch -ne "main" -and $branch -ne "master") {
+        $webUrl = "$webUrl/tree/$branch"
+    }
 
     Write-Host "Opening remote: $webUrl" -ForegroundColor Cyan
     
     # Open the URL in the default browser
     Start-Process $webUrl
 }
+
 
