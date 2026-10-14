@@ -255,8 +255,8 @@ function Invoke-GitBranchSwitchAll {
         git switch $cleanBranch
     }
 }
-New-Alias bso Invoke-GitBranchSwitchAll -Force
-    
+New-Alias sbo Invoke-GitBranchSwitchAll -Force
+
 # db -> Interactive Branch Deletion with Safeguards
 function Invoke-GitBranchDelete {
     # 1. Get clean list of local branches (excluding the current active one)
