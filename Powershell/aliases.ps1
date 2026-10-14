@@ -101,3 +101,6 @@ function Invoke-Exit { exit }
 Set-Alias -Name exti -Value Invoke-Exit
 
 function b { git branch $args }
+
+Set-Alias -Name lg -Value lazygit
+Set-Alias -Name ldn -Value lazydotnet
