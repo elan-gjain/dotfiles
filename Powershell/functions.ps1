@@ -326,45 +326,45 @@ function gor {
     Start-Process $webUrl
 }
 
-
-function pr {
+# pr -> Interactive Open PR Selector
+function Invoke-GitListOpenPRs {
     # 1. Ensure we are in a Git repository
     if (-not (git rev-parse --is-inside-work-tree 2>$null)) {
-        Write-Error "Not a git repository (or any of the parent directories)"
+        Write-Error "Not a git repository."
         return
     }
 
     # 2. Check if GitHub CLI is installed
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-        Write-Warning "GitHub CLI ('gh') is not installed. Falling back to URL construction..."
-        
-        # Fallback method: Manually build the URL from the remote origin
-        $repoUrl = git config --get remote.origin.url
-        if ($repoUrl -match "github.com[:/](.+?)/(.+?)(\.git)?$") {
-            $owner = $Matches[1]
-            $repo = $Matches[2]
-            $branch = git branch --show-current
-            $url = "https://github.com"
-            Start-Process $url
-        } else {
-            Write-Error "Could not parse GitHub remote URL."
-        }
+        Write-Error "GitHub CLI ('gh') is required to list PRs. Please install it."
         return
     }
 
-    # 3. Use GitHub CLI to find and open the open PR for the current branch
-    $currentBranch = git branch --show-current
-    Write-Host "Looking up open PR for branch: $currentBranch..." -ForegroundColor Cyan
-    
-    # Executing 'gh pr view --web' opens the current branch's PR in the browser
-    gh pr view --web 2>$null
+    # 3. Fetch open PRs as raw JSON fields (number, title, headRefName)
+    Write-Host "Fetching open pull requests..." -ForegroundColor Cyan
+    $prJson = gh pr list --state open --limit 50 --json number,title,headRefName 2>$null | ConvertFrom-Json
 
-    # 4. If no open PR exists, ask if the user wants to create one
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "No open pull request found for '$currentBranch'."
-        $choice = Read-Host "Would you like to create a new PR? (y/n)"
-        if ($choice -eq 'y') {
-            gh pr create --web
-        }
+    if (-not $prJson) {
+        Write-Warning "No open pull requests found for this repository."
+        return
+    }
+
+    # 4. Format lines with structured column padding for fzf
+    $fzfLines = foreach ($pr in $prJson) {
+        # Format: "#1234  [branch-name]  PR Title Text"
+        "#$($pr.number.ToString().PadRight(6)) [$($pr.headRefName.PadRight(20))]  $($pr.title)"
+    }
+
+    # 5. Pipe formatted list to fzf
+    $selected = $fzfLines | fzf --header="Select an open PR to view in browser" --height=40% --reverse
+
+    # 6. Extract the numeric ID from the selected line and open via gh pr view --web
+    if ($selected -match "^#(?<num>\d+)") {
+        $prNumber = $Matches.num
+        Write-Host "Opening PR #$prNumber in browser..." -ForegroundColor Green
+        gh pr view $prNumber --web
     }
 }
+New-Alias pr Invoke-GitListOpenPRs -Force
+
+
