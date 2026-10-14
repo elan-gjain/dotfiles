@@ -257,3 +257,36 @@ function Invoke-GitBranchSwitchAll {
 }
 New-Alias bso Invoke-GitBranchSwitchAll -Force
 
+# db -> Interactive Branch Deletion with Safeguards
+function Invoke-GitBranchDelete {
+    # 1. Get clean list of local branches (excluding the current active one)
+    $branch = git branch --format="%(refname:short)" | fzf --header="SELECT BRANCH TO DELETE (Cannot delete main/master)"
+    
+    if (-not $branch) {
+        Write-Host "Deletion cancelled. No branch selected." -ForegroundColor Yellow
+        return
+    }
+
+    $branch = $branch.Trim()
+
+    # 2. Strict protection for production/default branches
+    if ($branch -eq "master" -or $branch -eq "main") {
+        Write-Host "Action Denied: You cannot delete the '$branch' branch using this tool." -ForegroundColor Red
+        return
+    }
+
+    # 3. Request a clean console confirmation prompt
+    Write-Host ""
+    Write-Host "WARNING: You are about to delete local branch: " -NoNewline -ForegroundColor Yellow
+    Write-Host $branch -ForegroundColor Cyan
+    $confirmation = Read-Host "Do you really want to delete this branch? (y/N)"
+
+    # 4. Process deletion if explicitly confirmed
+    if ($confirmation -match "^[yY](es)?$") {
+        # Tries soft delete (-d) first, if not merged it will tell you, but you can swap to -D if you prefer forced
+        git branch -d $branch
+    } else {
+        Write-Host "Aborted. Branch '$branch' was not deleted." -ForegroundColor Yellow
+    }
+}
+New-Alias db Invoke-GitBranchDelete -Force
