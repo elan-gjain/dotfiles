@@ -290,3 +290,32 @@ function Invoke-GitBranchDelete {
     }
 }
 New-Alias db Invoke-GitBranchDelete -Force
+
+
+function gor {
+    # Check if the current directory is a git repository
+    if (-not (git rev-parse --is-inside-work-tree 2>$null)) {
+        Write-Error "Not a git repository (or any of the parent directories)"
+        return
+    }
+
+    # Fetch the remote origin URL
+    $remoteUrl = git remote get-url origin 2>$null
+
+    if (-not $remoteUrl) {
+        Write-Error "No remote 'origin' configured for this repository."
+        return
+    }
+
+    # Clean up SSH or HTTPS URL formatting into a browser-ready link
+    # Handles: git@github.com:user/repo.git or https://github.com
+    $webUrl = $remoteUrl -replace '^git@', 'https://' `
+                         -replace '(?<=https://[^/]+):', '/' `
+                         -replace '\.git\$', ''
+
+    Write-Host "Opening remote: $webUrl" -ForegroundColor Cyan
+    
+    # Open the URL in the default browser
+    Start-Process $webUrl
+}
+
