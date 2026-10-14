@@ -215,47 +215,85 @@ function touch {
     }
 }
 
-
 # sb -> Interactive Local Branch Switcher
 function Invoke-GitBranchSwitchLocal {
-    # Get clean list of local branches and pipe to fzf
-    $branch = git branch --format="%(refname:short)" | fzf --header="Switch Local Branch"
+    $currentBranch = git branch --show-current
     
-    if ($branch) {
-        git switch $branch.Trim()
+    # 1. Isolate master or main
+    $mainBranch = git branch --format="%(refname:short)" | Where-Object { $_ -eq "master" -or $_ -eq "main" } | Select-Object -First 1
+    
+    # 2. Get other branches (excluding main and the active current branch)
+    $otherLocal = git branch --format="%(refname:short)" | Where-Object { $_ -ne $mainBranch -and $_ -ne $currentBranch }
+
+    # 3. Format the active branch with the prefix
+    $decoratedCurrent = "› $currentBranch"
+
+    # Assemble array structure
+    $selection = @(
+        $mainBranch
+        $decoratedCurrent
+        $otherLocal
+        "+ Create New Branch"
+    ) | Where-Object { $_ } | fzf --header="Switch Local Branch"
+    
+    if ($selection) {
+        if ($selection -eq "+ Create New Branch") {
+            $newBranch = Read-Host "Enter new branch name"
+            if ($newBranch) { git checkout -b $newBranch.Trim() }
+        } else {
+            # Strip the layout prefix if they selected the current branch line
+            $cleanBranch = $selection -replace "^› ", ""
+            git switch $cleanBranch.Trim()
+        }
     }
 }
 New-Alias sb Invoke-GitBranchSwitchLocal -Force
 
 # sbo -> Interactive Local + Remote Branch Switcher (with separator)
 function Invoke-GitBranchSwitchAll {
-    # 1. Fetch clean local branches
-    $localBranches = git branch --format="%(refname:short)"
+    $currentBranch = git branch --show-current
     
-    # 2. Fetch remote branches, removing the 'origin/' prefix to make switching clean
+    # 1. Isolate master or main
+    $mainBranch = git branch --format="%(refname:short)" | Where-Object { $_ -eq "master" -or $_ -eq "main" } | Select-Object -First 1
+    
+    # 2. Get remaining local branches
+    $otherLocal = git branch --format="%(refname:short)" | Where-Object { $_ -ne $mainBranch -and $_ -ne $currentBranch }
+    
+    # 3. Fetch remote branches cleanly
     $remoteBranches = git branch -r --format="%(refname:short)" | Where-Object { $_ -notmatch '->' }
     
-    # 3. Combine them using fzf's header lines or build an inline header separator
-    # We pipe local branches first, a custom visual separator line, then remote branches
+    # 4. Format active branch with prefix
+    $decoratedCurrent = "› $currentBranch"
+
+    # Assemble full structure
     $selection = @(
-        $localBranches
+        $mainBranch
+        $decoratedCurrent
+        $otherLocal
+        "+ Create New Branch"
         "--- REMOTE BRANCHES ---"
         $remoteBranches
-    ) | fzf --header="Switch Branch (Local or Remote)" --preview-window=hidden
+    ) | Where-Object { $_ } | fzf --header="Switch Branch (Local or Remote)" --preview-window=hidden
     
-    # 4. Process selection (ignore if they click the separator label)
     if ($selection -and $selection -ne "--- REMOTE BRANCHES ---") {
-        $cleanBranch = $selection.Trim()
-        
-        # If it's a remote branch (starts with origin/), strip it so git switch tracks it locally
-        if ($cleanBranch -like "origin/*") {
-            $cleanBranch = $cleanBranch -replace "^origin/", ""
+        if ($selection -eq "+ Create New Branch") {
+            $newBranch = Read-Host "Enter new branch name"
+            if ($newBranch) { git checkout -b $newBranch.Trim() }
+        } else {
+            # Clean off any design formatting elements
+            $cleanBranch = $selection -replace "^› ", ""
+            $cleanBranch = $cleanBranch.Trim()
+            
+            # Remove tracking prefix for clean remote matching
+            if ($cleanBranch -like "origin/*") {
+                $cleanBranch = $cleanBranch -replace "^origin/", ""
+            }
+            git switch $cleanBranch
         }
-        
-        git switch $cleanBranch
     }
 }
 New-Alias sbo Invoke-GitBranchSwitchAll -Force
+
 
 # db -> Interactive Branch Deletion with Safeguards
 function Invoke-GitBranchDelete {
