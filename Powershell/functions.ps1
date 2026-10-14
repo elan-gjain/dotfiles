@@ -327,3 +327,44 @@ function gor {
 }
 
 
+function pr {
+    # 1. Ensure we are in a Git repository
+    if (-not (git rev-parse --is-inside-work-tree 2>$null)) {
+        Write-Error "Not a git repository (or any of the parent directories)"
+        return
+    }
+
+    # 2. Check if GitHub CLI is installed
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        Write-Warning "GitHub CLI ('gh') is not installed. Falling back to URL construction..."
+        
+        # Fallback method: Manually build the URL from the remote origin
+        $repoUrl = git config --get remote.origin.url
+        if ($repoUrl -match "github.com[:/](.+?)/(.+?)(\.git)?$") {
+            $owner = $Matches[1]
+            $repo = $Matches[2]
+            $branch = git branch --show-current
+            $url = "https://github.com"
+            Start-Process $url
+        } else {
+            Write-Error "Could not parse GitHub remote URL."
+        }
+        return
+    }
+
+    # 3. Use GitHub CLI to find and open the open PR for the current branch
+    $currentBranch = git branch --show-current
+    Write-Host "Looking up open PR for branch: $currentBranch..." -ForegroundColor Cyan
+    
+    # Executing 'gh pr view --web' opens the current branch's PR in the browser
+    gh pr view --web 2>$null
+
+    # 4. If no open PR exists, ask if the user wants to create one
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "No open pull request found for '$currentBranch'."
+        $choice = Read-Host "Would you like to create a new PR? (y/n)"
+        if ($choice -eq 'y') {
+            gh pr create --web
+        }
+    }
+}
