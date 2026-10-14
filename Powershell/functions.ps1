@@ -216,7 +216,7 @@ function touch {
 }
 
 
-# bs -> Interactive Local Branch Switcher
+# sb -> Interactive Local Branch Switcher
 function Invoke-GitBranchSwitchLocal {
     # Get clean list of local branches and pipe to fzf
     $branch = git branch --format="%(refname:short)" | fzf --header="Switch Local Branch"
@@ -225,9 +225,9 @@ function Invoke-GitBranchSwitchLocal {
         git switch $branch.Trim()
     }
 }
-New-Alias bs Invoke-GitBranchSwitchLocal -Force
+New-Alias sb Invoke-GitBranchSwitchLocal -Force
 
-# bso -> Interactive Local + Remote Branch Switcher (with separator)
+# sbo -> Interactive Local + Remote Branch Switcher (with separator)
 function Invoke-GitBranchSwitchAll {
     # 1. Fetch clean local branches
     $localBranches = git branch --format="%(refname:short)"
@@ -256,7 +256,7 @@ function Invoke-GitBranchSwitchAll {
     }
 }
 New-Alias bso Invoke-GitBranchSwitchAll -Force
-
+    
 # db -> Interactive Branch Deletion with Safeguards
 function Invoke-GitBranchDelete {
     # 1. Get clean list of local branches (excluding the current active one)
