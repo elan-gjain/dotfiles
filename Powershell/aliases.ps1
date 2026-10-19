@@ -69,7 +69,7 @@ function ls {
 }
 
 function ll {
-    eza.exe --long --icons=never --group-directories-first --git $args
+    eza.exe -la --long --icons=never --group-directories-first --git $args
 }
 
 function l {
@@ -104,3 +104,6 @@ function b { git branch $args }
 
 Set-Alias -Name lg -Value lazygit
 Set-Alias -Name ldn -Value lazydotnet
+
+function pm { git switch master && git pull }
+function pull { git pull $args }

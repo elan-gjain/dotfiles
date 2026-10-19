@@ -182,15 +182,77 @@ function Update-Requirements {
         pip install -r requirements.txt --extra-index-url $env:ELANPYPI_URL
     }
 }
-
 function Find-File {
-    param(
-        [Parameter(Mandatory=$true, Position=0)]
-        [string]$SearchTerm
-    )
-    rg --files | rg -i $SearchTerm
+    $Single = $false
+    $OpenInCode = $false
+    $CleanArgs = @()
+
+    foreach ($arg in $args) {
+        if ($arg -eq '-1') {
+            $Single = $true
+        }
+        elseif ($arg -eq '-c') {
+            $OpenInCode = $true
+        }
+        elseif ($arg -eq '-1c' -or $arg -eq '-c1') {
+            $Single = $true
+            $OpenInCode = $true
+        }
+        else {
+            $CleanArgs += $arg
+        }
+    }
+
+    $SearchTerm = $CleanArgs -join ' '
+
+    if (-not $SearchTerm) {
+        Write-Host "Please provide a search term." -ForegroundColor Red
+        return
+    }
+
+    # Gather matching filenames and explicitly sort them alphabetically
+    $matches = @(rg --files | rg -i -- $SearchTerm | Sort-Object)
+
+    if ($matches.Count -eq 0) {
+        Write-Host "No files found matching '$SearchTerm'." -ForegroundColor Yellow
+        return
+    }
+
+    # Decide workflow based on the -1 (Single) flag
+    if ($Single) {
+        if ($matches.Count -eq 1) {
+            $selection = $matches
+        }
+        else {
+            # Multiple files -> interactive fzf picker
+            $selection = $matches | fzf --header="Multiple files found. Select one:" --preview="bat --style=numbers --color=always {}"
+        }
+
+        # Apply action based on the -c flag
+        if ($selection) {
+            if ($OpenInCode) {
+                # Launch code instantly without waiting
+                Start-Process code -ArgumentList "`"$selection`"" -WindowStyle Hidden
+            } else {
+                return $selection
+            }
+        }
+    }
+    else {
+        # Standard behaviour without -1 flag
+        if ($OpenInCode) {
+            # Batch all paths into a single call and open in background immediately
+            $quotedMatches = $matches | ForEach-Object { "`"$_`"" }
+            Start-Process code -ArgumentList $quotedMatches -WindowStyle Hidden
+        } else {
+            # Print the colorized, highlighted filenames to the console
+            rg --files | rg -i --color=always -- $SearchTerm | Sort-Object
+        }
+    }
 }
-Set-Alias ff Find-File
+
+Set-Alias ff Find-File -Force
+
 
 function touch {
     param(
@@ -222,15 +284,15 @@ function Invoke-GitBranchSwitchLocal {
     # 1. Isolate master or main
     $mainBranch = git branch --format="%(refname:short)" | Where-Object { $_ -eq "master" -or $_ -eq "main" } | Select-Object -First 1
     
-    # 2. Get other branches (excluding main and the active current branch)
+    # 2. Get other branches (excluding main AND the active current branch)
     $otherLocal = git branch --format="%(refname:short)" | Where-Object { $_ -ne $mainBranch -and $_ -ne $currentBranch }
-
+    
     # 3. Format the active branch with the prefix
     $decoratedCurrent = "› $currentBranch"
-
+    
     # Assemble array structure
     $selection = @(
-        $mainBranch
+        if ($currentBranch -ne $mainBranch) { $mainBranch }
         $decoratedCurrent
         $otherLocal
         "+ Create New Branch"
@@ -238,12 +300,33 @@ function Invoke-GitBranchSwitchLocal {
     
     if ($selection) {
         if ($selection -eq "+ Create New Branch") {
-            $newBranch = Read-Host "Enter new branch name"
-            if ($newBranch) { git checkout -b $newBranch.Trim() }
-        } else {
-            # Strip the layout prefix if they selected the current branch line
-            $cleanBranch = $selection -replace "^› ", ""
-            git switch $cleanBranch.Trim()
+            $rawBranchInput = Read-Host "Enter description or commit text for new branch"
+            if ($rawBranchInput) {
+                # Format the branch name cleanly using the gen-branch function rules
+                $newBranch = New-GitBranchName -InputText $rawBranchInput
+                git checkout -b $newBranch
+            }
+        }
+        # Safely exit if they selected the branch they are already standing on
+        elseif ($selection -eq $decoratedCurrent -or $selection.Trim() -eq $currentBranch) {
+            Write-Host "Already on '$currentBranch'" -ForegroundColor Cyan
+            return
+        }
+        else {
+            # Strip layout prefix using a wildcard match to bypass encoding quirks
+            $cleanBranch = ($selection -replace "^.*?\s+", "").Trim()
+            
+            git switch $cleanBranch
+            
+            # Check if git switch failed (e.g., due to unstaged changes)
+            if ($LASTEXITCODE -ne 0) {
+                $confirmation = Read-Host "Switch failed. Force switch? (Discard unstaged changes) [y/N]"
+                if ($confirmation -match '^[yY](es)?$') {
+                    git switch -f $cleanBranch
+                } else {
+                    Write-Host "Switch aborted." -ForegroundColor Yellow
+                }
+            }
         }
     }
 }
@@ -264,10 +347,10 @@ function Invoke-GitBranchSwitchAll {
     
     # 4. Format active branch with prefix
     $decoratedCurrent = "› $currentBranch"
-
+    
     # Assemble full structure
     $selection = @(
-        $mainBranch
+        if ($currentBranch -ne $mainBranch) { $mainBranch }
         $decoratedCurrent
         $otherLocal
         "+ Create New Branch"
@@ -277,18 +360,37 @@ function Invoke-GitBranchSwitchAll {
     
     if ($selection -and $selection -ne "--- REMOTE BRANCHES ---") {
         if ($selection -eq "+ Create New Branch") {
-            $newBranch = Read-Host "Enter new branch name"
-            if ($newBranch) { git checkout -b $newBranch.Trim() }
-        } else {
-            # Clean off any design formatting elements
-            $cleanBranch = $selection -replace "^› ", ""
+            $rawBranchInput = Read-Host "Enter description or commit text for new branch"
+            if ($rawBranchInput) {
+                # Format the branch name cleanly using the gen-branch function rules
+                $newBranch = New-GitBranchName -InputText $rawBranchInput
+                git checkout -b $newBranch
+            }
+        }
+        # Safely exit if they selected the branch they are already standing on
+        elseif ($selection -eq $decoratedCurrent -or $selection.Trim() -eq $currentBranch) {
+            Write-Host "Already on '$currentBranch'" -ForegroundColor Cyan
+            return
+        }
+        else {
+            # Strip layout prefix using a wildcard match to bypass encoding quirks
+            $cleanBranch = $selection -replace "^.*?\s+", ""
             $cleanBranch = $cleanBranch.Trim()
-            
-            # Remove tracking prefix for clean remote matching
             if ($cleanBranch -like "origin/*") {
                 $cleanBranch = $cleanBranch -replace "^origin/", ""
             }
+            
             git switch $cleanBranch
+            
+            # Check if git switch failed (e.g., due to unstaged changes)
+            if ($LASTEXITCODE -ne 0) {
+                $confirmation = Read-Host "Switch failed. Force switch? (Discard unstaged changes) [y/N]"
+                if ($confirmation -match '^[yY](es)?$') {
+                    git switch -f $cleanBranch
+                } else {
+                    Write-Host "Switch aborted." -ForegroundColor Yellow
+                }
+            }
         }
     }
 }
@@ -405,4 +507,222 @@ function Invoke-GitListOpenPRs {
 }
 New-Alias pr Invoke-GitListOpenPRs -Force
 
+
+function Invoke-GitStashInteractive {
+    # 1. Fetch the stash list
+    $stashList = git stash list
+
+    if (-not $stashList) {
+        Write-Host "No stashes found." -ForegroundColor Yellow
+        return
+    }
+
+    # 2. Add an option to create a new stash at the top of the list
+    $options = @("+ Create New Stash") + $stashList
+
+    # 3. Simple list picker
+    $selection = $options | fzf --header="Git Stash Manager (Enter: Select | Esc: Cancel)"
+
+    if (-not $selection) {
+        return
+    }
+
+    # Handle creation of a new stash
+    if ($selection -eq "+ Create New Stash") {
+        $message = Read-Host "Enter stash message (Optional)"
+        if ($message.Trim()) {
+            git stash push -m $message.Trim()
+        } else {
+            git stash push
+        }
+        return
+    }
+
+    # Extract the exact stash identifier (e.g., stash@{2}) using explicit array access [0]
+    if ($selection -match 'stash@\{[0-9]+\}') {
+        $targetStash = $matches[0]
+    } else {
+        Write-Host "Could not parse stash selection." -ForegroundColor Red
+        return
+    }
+
+    # 4. Standard sequential workflow options via Read-Host
+    Write-Host "`nSelected: $selection" -ForegroundColor Cyan
+    Write-Host "Choose an action:"
+    Write-Host "  [a] Apply (Keep in stash list)"
+    Write-Host "  [p] Pop   (Apply and remove from list)"
+    Write-Host "  [d] Drop  (Delete from list)"
+    Write-Host "  [v] View full diff"
+    Write-Host "  [c] Cancel"
+    
+    $action = Read-Host "Action"
+
+    switch ($action.ToLower().Trim()) {
+        "a" { git stash apply $targetStash }
+        "p" { git stash pop $targetStash }
+        "d" { 
+            $confirm = Read-Host "Are you sure you want to drop $targetStash? [y/N]"
+            if ($confirm -match '^[yY](es)?$') {
+                git stash drop $targetStash
+            } else {
+                Write-Host "Dropped aborted." -ForegroundColor Yellow
+            }
+        }
+        "v" { git stash show -p $targetStash }
+        default { Write-Host "Action cancelled." -ForegroundColor Yellow }
+    }
+}
+
+# Clear out pre-existing conflicts for 'gs'
+if (Get-Alias gs -ErrorAction SilentlyContinue) { Remove-Item alias:gs -Force }
+
+# Establish alias
+New-Alias gs Invoke-GitStashInteractive -Force
+
+
+function New-GitBranchName {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
+        [string]$InputText
+    )
+
+    # 1. Handle the 'TECH-####' exception by preserving it while lowercasing everything else
+    # We find 'TECH-\d+' and lowercase everything except matches found by regex
+    $processedText = [regex]::Replace($InputText, '(?i)\btech-\d+\b|.+?', {
+        param($match)
+        if ($match.Value -match '(?i)^tech-\d+$') {
+            # Keep TECH- capitalized, but ensure the word 'TECH' itself is uppercase
+            return $match.Value.ToUpper()
+        }
+        # Lowercase everything else
+        return $match.Value.ToLower()
+    })
+
+    # 2. Clean up characters: Remove special characters, keep only alphanumerics, spaces, and hyphens
+    $cleanedText = $processedText -replace '[^a-z0-9\s\-]', ''
+
+    # 3. Replace all spaces (and multiple spaces/hyphens) with a single hyphen
+    $branchName = $cleanedText -replace '[\s\-]+', '-'
+
+    # Trim trailing or leading hyphens
+    return $branchName.Trim('-')
+}
+
+# Set the requested alias
+Set-Alias -Name gen-branch -Value New-GitBranchName
+
+function goto {
+    param (
+        [Parameter(Position = 0)]
+        [string]$Target
+    )
+
+    # 1. Configuration Path
+    $MappingFile = "$HOME/documents/github/dotfiles/PowerShell/mappings.json"
+    if (-not (Test-Path $MappingFile)) {
+        Write-Error "Mapping file not found at $MappingFile"
+        return
+    }
+
+    # 2. Parse JSON & resolve paths upfront
+    $Mappings = Get-Content -Raw $MappingFile | ConvertFrom-Json
+    $ResolvedList = foreach ($Prop in $Mappings.PSObject.Properties) {
+        $RawPath = $Prop.Value
+        $Expanded = [Environment]::ExpandEnvironmentVariables($RawPath).Replace('$HOME', $HOME).Replace('/', '\')
+        
+        # Safe acronym generation using native methods (e.g., "data-portal" -> "dp")
+        $SplitWords = $Prop.Name -split '[-_\s]'
+        $Initials = ($SplitWords.ForEach({ $_[0] }) -join '').ToLower()
+
+        [PSCustomObject]@{
+            Key      = $Prop.Name
+            Path     = $Expanded
+            Initials = $Initials
+        }
+    }
+
+    $FinalMatch = $null
+
+    # 3. Scenario A: No argument provided -> Open full fzf menu
+    if ([string]::IsNullOrWhiteSpace($Target)) {
+        if (-not (Get-Command fzf -ErrorAction SilentlyContinue)) {
+            Write-Error "fzf is required for interactive mode."
+            return
+        }
+
+        # Build visual list and append the edit option at the very bottom
+        $FzfInput = [System.Collections.Generic.List[string]]::new()
+        foreach ($Item in $ResolvedList) {
+            $FzfInput.Add(("{0,-15} -> {1}" -f $Item.Key, $Item.Path))
+        }
+        $FzfInput.Add("[Edit Mappings File]")
+
+        $Selection = $FzfInput | fzf --height 40% --reverse --header="Select a directory shortcut:"
+        if ([string]::IsNullOrWhiteSpace($Selection)) { return }
+        
+        # Check if the user selected the edit option
+        if ($Selection -eq "[Edit Mappings File]") {
+            code $MappingFile
+            return
+        }
+
+        # CRITICAL FIX: Extract ONLY the first string (index 0) from the fzf selection row
+        $SelectedKey = ($Selection -split '\s+')[0]
+        $FinalMatch = $ResolvedList | Where-Object { $_.Key -eq $SelectedKey } | Select-Object -First 1
+    }
+    else {
+        # 4. Scenario B: Explicit argument passed -> Deep Fuzzy & Abbreviation Match
+        $CleanTarget = $Target.Replace('-', '').Replace('_', '').ToLower()
+        
+        # Generate a regex pattern for fuzzy typing (e.g., "dapi" becomes "d.*a.*p.*i")
+        $FuzzyChars = [char[]]$CleanTarget | ForEach-Object { [regex]::Escape($_) }
+        $FuzzyPattern = $FuzzyChars -join '.*'
+
+        $Matches = $ResolvedList | Where-Object {
+            $CleanKey = $_.Key.Replace('-', '').Replace('_', '').ToLower()
+            
+            # Match checks: exact, substring, acronym initials, or deep fuzzy sequence
+            $_.Key.ToLower() -eq $Target.ToLower() -or 
+            $CleanKey.Contains($CleanTarget) -or
+            $_.Initials -eq $Target.ToLower() -or
+            $CleanKey -match $FuzzyPattern
+        }
+
+        # 5. Handle Matches intelligently
+        if ($Matches.Count -eq 0) {
+            Write-Error "go: No mapping found matching '$Target'"
+            return
+        } 
+        elseif ($Matches.Count -eq 1) {
+            $FinalMatch = $Matches
+        } 
+        else {
+            # Multiple matches found -> Pipe conflicts into fzf
+            if (Get-Command fzf -ErrorAction SilentlyContinue) {
+                $FzfInput = $Matches | ForEach-Object { "{0,-15} -> {1}" -f $_.Key, $_.Path }
+                $Selection = $FzfInput | fzf --height 40% --reverse --header="Multiple matches found for '$Target'. Pick one:"
+                
+                if ([string]::IsNullOrWhiteSpace($Selection)) { return }
+                
+                # CRITICAL FIX: Extract index 0 here too
+                $SelectedKey = ($Selection -split '\s+')[0]
+                $FinalMatch = $Matches | Where-Object { $_.Key -eq $SelectedKey } | Select-Object -First 1
+            } else {
+                $FinalMatch = $Matches[0]
+            }
+        }
+    }
+
+    # 6. Execute CD
+    if ($FinalMatch) {
+        if (Test-Path $FinalMatch.Path) {
+            Set-Location $FinalMatch.Path
+        } else {
+            Write-Error "Directory does not exist: $($FinalMatch.Path)"
+        }
+    }
+}
+
+New-Alias go goto 
 
