@@ -107,3 +107,11 @@ Set-Alias -Name ldn -Value lazydotnet
 
 function pm { git switch master && git pull }
 function pull { git pull $args }
+
+
+Remove-Item Alias:cat -ErrorAction SilentlyContinue
+Set-Alias -Name cat -Value bat
+
+function stash {lazygit stash $args}
+
+function lb { git branch }

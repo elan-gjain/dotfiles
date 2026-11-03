@@ -4,7 +4,7 @@
     "data-api": "$HOME/documents/github/data-api",
     "edge-net": "$HOME/documents/github/edge.net",
     "data-portal": "$HOME/documents/github/data-portal",
-    "dotfiles": "$HOME/documents/github/dotfiles",
     "airflow": "$HOME/documents/github/data-airflow-dags",
-    "dags": "$HOME/documents/github/data-airflow-dags"
+    "dags": "$HOME/documents/github/data-airflow-dags",
+    "dotfiles": "$HOME/documents/github/dotfiles"
 }

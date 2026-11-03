@@ -178,8 +178,10 @@ function Update-Requirements {
             return
         }
 
+        Write-Host "Using Python version: $(python --version) from $(Get-Command python | Select-Object -ExpandProperty Source)"
+
         Write-Host "Installing Python packages from requirements.txt..." -ForegroundColor Cyan
-        pip install -r requirements.txt --extra-index-url $env:ELANPYPI_URL
+        python -m pip install -r requirements.txt --extra-index-url $env:ELANPYPI_URL
     }
 }
 function Find-File {
