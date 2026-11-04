@@ -115,3 +115,13 @@ Set-Alias -Name cat -Value bat
 function stash {lazygit stash $args}
 
 function lb { git branch }
+
+if (Get-Command -Name gp -Type Alias -ErrorAction SilentlyContinue) { 
+    Remove-Item Alias:\gp -Force 
+}
+function gp { git pull $args }
+
+if (Get-Command -Name gf -Type Alias -ErrorAction SilentlyContinue) { 
+    Remove-Item Alias:\gf -Force 
+}
+function gf { git fetch origin $args }
