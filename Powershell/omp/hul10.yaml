@@ -1,0 +1,78 @@
+$schema: https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json
+console_title_template: "{{if .Root}}[root] {{end}}{{.Shell}} in <{{.Folder}}>"
+final_space: true
+version: 4
+palette:
+  white: "#f7f7f7"
+  black: "#111111"
+  gray: "#464646"
+  orange: "#f37a13"
+  purple: "#B388FF"
+  crimson: "#FF4500"
+blocks:
+  - type: prompt
+    alignment: left
+    newline: true
+    segments:
+      - background: transparent
+        foreground: p:white
+        style: plain
+        template: ┌
+        type: text
+      - background: p:gray
+        foreground: p:white
+        style: plain
+        template: " {{.Icon}}{{if .WSL}} (WSL){{end}} ⠀"
+        type: os
+        options:
+          windows: 
+          linux: 
+          ubuntu: 
+          macos: 
+      - background: p:white
+        foreground: p:black
+        style: plain
+        template: "   {{.Name}}⠀"
+        type: shell
+      - background: p:gray
+        foreground: p:white
+        style: plain
+        template: "   {{.HostName}}{{.UserName}}⠀"
+        type: session
+      - background: p:white
+        background_templates:
+          - "{{ if or (.Working.Changed) (.Staging.Changed) }}p:orange{{ end }}"
+          - "{{ if and (gt .Ahead 0) (gt .Behind 0) }}p:crimson{{ end }}"
+          - "{{ if gt .Ahead 0 }}p:purple{{ end }}"
+          - "{{ if gt .Behind 0 }}p:purple{{ end }}"
+        foreground: p:black
+        style: plain
+        template: "{{.HEAD}}⠀"
+        type: git
+        options:
+          branch_icon: "  "
+  - type: prompt
+    alignment: left
+    newline: true
+    segments:
+      - background: transparent
+        foreground: p:white
+        style: plain
+        template: <p:white>└</><#93d0ff>[</> {{.Path}} <#93d0ff>]</>
+        type: path
+        options:
+          folder_icon: 
+          folder_separator_template: <#93d0ff> » </>
+          home_icon: 
+          style: folder
+  - type: prompt
+    alignment: left
+    newline: true
+    segments:
+      - background: transparent
+        foreground: p:orange
+        style: plain
+        template: "<b>λ</b>"
+        type: status
+        options:
+          always_enabled: true

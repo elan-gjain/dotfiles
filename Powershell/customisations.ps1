@@ -1,5 +1,5 @@
 if (Get-Command posh -ErrorAction SilentlyContinue) {
-    posh init pwsh --config 'C:\Users\gjain\Documents\WindowsPowerShell\OhMyPosh\janededobbleer-edited.json' | Invoke-Expression
+    posh init pwsh --config "$HOME\Documents\GitHub\dotfiles\Powershell\omp\hul10.yaml" | Invoke-Expression
 }
 
 # Removes '--height' restriction to enforce a modern, fullscreen view
@@ -18,7 +18,7 @@ if (Get-Module -ListAvailable PSReadLine) {
 $env:ARTIFACTS_CREDENTIALPROVIDER_FEED_PROVIDER_CHOICE = "AzCli"
 
 # Custom Profile Path Mappings
-$env:PROFILE_IMPORTS          = "$HOME\Documents\GitHub\dotfiles\PowerShell\imports.ps1"
+$env:PROFILE_IMPORTS        = "$HOME\Documents\GitHub\dotfiles\PowerShell\imports.ps1"
 $env:PROFILE_CUSTOMISATIONS = "$HOME\Documents\GitHub\dotfiles\PowerShell\customisations.ps1"
 $env:PROFILE_FUNCTIONS      = "$HOME\Documents\GitHub\dotfiles\PowerShell\functions.ps1"
 $env:PROFILE_ALIASES        = "$HOME\Documents\GitHub\dotfiles\PowerShell\aliases.ps1"
