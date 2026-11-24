@@ -220,6 +220,10 @@ function Find-File {
         return
     }
 
+    if ($MyInvocation.PipelineLength -gt 1) {
+        return $matches
+    }
+
     # Decide workflow based on the -1 (Single) flag
     if ($Single) {
         if ($matches.Count -eq 1) {
