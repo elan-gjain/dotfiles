@@ -726,5 +726,100 @@ function goto {
     }
 }
 
-New-Alias go goto 
+New-Alias go goto -Force
 
+
+function gopicker {
+    param (
+        [Parameter(Position = 0)]
+        [string]$Target
+    )
+
+    # 1. Gather subdirectories in the current location
+    $Directories = Get-ChildItem -Directory -ErrorAction SilentlyContinue
+
+    if (-not $Directories) {
+        Write-Warning "No subdirectories found in the current directory."
+        return
+    }
+
+    # 2. Build metadata & initials upfront (e.g., "data-portal" -> "dp")
+    $ResolvedList = foreach ($Dir in $Directories) {
+        $SplitWords = $Dir.Name -split '[-_\s]' | Where-Object { $_ -ne '' }
+        $Initials = ($SplitWords.ForEach({ $_[0] }) -join '').ToLower()
+
+        [PSCustomObject]@{
+            Name     = $Dir.Name
+            Path     = $Dir.FullName
+            Initials = $Initials
+        }
+    }
+
+    $FinalMatch = $null
+
+    # 3. Scenario A: No argument provided -> Open full fzf menu
+    if ([string]::IsNullOrWhiteSpace($Target)) {
+        if (-not (Get-Command fzf -ErrorAction SilentlyContinue)) {
+            Write-Error "fzf is required for interactive mode."
+            return
+        }
+
+        $Selection = $ResolvedList.Name | fzf --height 40% --reverse --header="Select a folder in current directory:"
+
+        if ([string]::IsNullOrWhiteSpace($Selection)) {
+            return
+        }
+
+        $FinalMatch = $ResolvedList | Where-Object { $_.Name -eq $Selection } | Select-Object -First 1
+    }
+    else {
+        # 4. Scenario B: Explicit argument passed -> Deep Fuzzy & Abbreviation Match
+        $CleanTarget = $Target.Replace('-', '').Replace('_', '').ToLower()
+
+        # Generate a regex pattern for fuzzy typing (e.g., "dapi" becomes "d.*a.*p.*i")
+        $FuzzyChars = [char[]]$CleanTarget | ForEach-Object { [regex]::Escape($_) }
+        $FuzzyPattern = $FuzzyChars -join '.*'
+
+        $Matches = @($ResolvedList | Where-Object {
+            $CleanName = $_.Name.Replace('-', '').Replace('_', '').ToLower()
+
+            # Match checks: exact, substring, acronym initials, or deep fuzzy sequence
+            $_.Name.ToLower() -eq $Target.ToLower() -or
+            $CleanName.Contains($CleanTarget) -or
+            $_.Initials -eq $Target.ToLower() -or
+            $CleanName -match $FuzzyPattern
+        })
+
+        # 5. Handle Matches intelligently
+        if ($Matches.Count -eq 0) {
+            Write-Error "go: No folder found matching '$Target'"
+            return
+        }
+        elseif ($Matches.Count -eq 1) {
+            $FinalMatch = $Matches[0]
+        }
+        else {
+            # Multiple matches found -> Pipe conflicts into fzf
+            if (Get-Command fzf -ErrorAction SilentlyContinue) {
+                $Selection = $Matches.Name | fzf --height 40% --reverse --header="Multiple folders found for '$Target'. Pick one:"
+
+                if ([string]::IsNullOrWhiteSpace($Selection)) {
+                    return
+                }
+
+                $FinalMatch = $Matches | Where-Object { $_.Name -eq $Selection } | Select-Object -First 1
+            }
+            else {
+                $FinalMatch = $Matches[0]
+            }
+        }
+    }
+
+    # 6. Execute CD
+    if ($FinalMatch -and (Test-Path -LiteralPath $FinalMatch.Path)) {
+        Set-Location -LiteralPath $FinalMatch.Path
+    }
+}
+
+Set-Alias -Name "go." -Value gopicker
+Set-Alias -Name "gogo" -Value gopicker
