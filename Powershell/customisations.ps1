@@ -19,6 +19,7 @@ if (Get-Module -ListAvailable PSReadLine) {
 }
 
 $env:ARTIFACTS_CREDENTIALPROVIDER_FEED_PROVIDER_CHOICE = "AzCli"
+$env:AZURE_TOKEN_CREDENTIALS="dev"
 
 # Custom Profile Path Mappings
 $env:PROFILE_IMPORTS        = "$HOME\Documents\GitHub\dotfiles\PowerShell\imports.ps1"
