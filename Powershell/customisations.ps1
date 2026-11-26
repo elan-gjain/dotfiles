@@ -1,6 +1,9 @@
 if (Get-Command posh -ErrorAction SilentlyContinue) {
     posh init pwsh --config "$HOME\Documents\GitHub\dotfiles\Powershell\omp\hul10.yaml" | Invoke-Expression
 }
+if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) {
+    oh-my-posh init pwsh --config "$HOME\Documents\GitHub\dotfiles\Powershell\omp\hul10.yaml" | Invoke-Expression
+}
 
 # Removes '--height' restriction to enforce a modern, fullscreen view
 $env:FZF_DEFAULT_OPTS = "--layout=reverse --no-height --ansi --border"
